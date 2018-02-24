@@ -7,8 +7,8 @@
     --HPF-Aging
 
     Algorithms Completed:
-    * FCFS
-    * SRT
+    * FCFS (preemptive)
+    * SRT (preemptive)
     * HPF (preemptive)
     * HPF-aging (preemptive)
 
@@ -34,6 +34,14 @@
 	Also, one job(id 0: A) will always arrive at quantum 0 (why the shufbag does not have 0).
 
     ^Do something about cpu being idle for >2 quanta?
+*/
+
+/*
+File: main.cpp
+Description: Simulation of multiple process scheduling algorithms including FCFS, SRT,
+             HPF, etc. over 5 runs with each run lasting 100 quantas. Each run consists
+             a total of 12 jobs.
+
 */
 
 #include "syms.h"
@@ -69,7 +77,10 @@ struct Sim
     decltype(&fcfs) algo; //function ptr. a better name for decltype() would be typeof()
 };
 
-//
+// Structure containing job statistics
+// wait: how long the job had to wait until execution (execution time - arrival time)
+// response:
+// turnaround: completion time - arrival time
 struct Sums
 {
     int wait, response, turnaround;
@@ -263,13 +274,13 @@ int main(int argc, char** argv)
 	return 0;
 } // end of main()
 
-// First Come First Serve Scheduling  comptime: current quanta + Algorithm
+// First Come First Serve Scheduling Algorithm
 // Returns AlgoRet consisting of:
 // 1) number of jobs completed
 // 2) time of last job completion 
 AlgoRet fcfs(const Job* job, int njobs, PerJobStats* stats, char* t)
 {
-    int j=0; // variable to keep track of j^th run 
+    int j=0; // variable to keep track of j^th job 
     int q=0; // variable for current quanta time (elapsed quanta)
 
     // Continue running jobs until elasped quanta is 100
@@ -278,21 +289,24 @@ AlgoRet fcfs(const Job* job, int njobs, PerJobStats* stats, char* t)
         // if job arrival time is greater than current quanta
         if (q < job[j].arrival)
         {
-            // CPU waiting from current quanta until job arrival
+            // print '.' to signify waiting from current quanta until job arrival
             fill(t+q, t+job[j].arrival, '.');
             // set current quanta to job arrival time
             q = job[j].arrival;
         }
         
-        // comptime: current quanta + burst (time at which the job finished) 
+        // job completion time: current quanta + burst
         int const comptime = q+job[j].burst;
  
-        // store stats for j^th run
-        // current quanta and   
+        // store stats for j^th job
+        // current quanta and completion time 
         stats[j] = {q, comptime};
-
+        
+        // print letter to signify job is running
+        // j ranges from 1 to 12, 1 + A = B, 2 + A = C, etc.
         fill(t+q, t+comptime, j+'A');
         q = comptime;
+        // once 12 jobs have ran, we're done
         if (++j==njobs)
             break;
     }
@@ -331,7 +345,7 @@ AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
     PriorityQueue<QueueData, CmpFunc> pque(njobs);
 
     int j=0;
-    int q=0;//elapsed quanta
+    int q=0; //elapsed quanta
     //every job will be inserted, unlike fcfs
     while (j!=njobs)//q steps +1 each loop
     {
