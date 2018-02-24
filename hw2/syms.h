@@ -6,16 +6,21 @@
 
 #define INIT_SEED 0xcafebeef // use same rng seed so each algo uses same data
 #define QUANTA 100	         // units of time
-#define NJOBS 12	         // total number of jobs/processes ran 
+#define NJOBS 12	           // total number of jobs/processes ran 
 #define MAX_BURST 16
 #define MIN_BURST 3
 #define BURST_SPAN (MAX_BURST-MIN_BURST+1u)
 
+
+// Structure for each process job containing:
+// 1) arrival time
+// 2) burst time
+// 3) priority 
 struct Job
 {
 	int arrival;  // arrival time of process in quanta
-	int burst;    //quanta needed to fully run, > 0
-	int priority; //[1 to 4] inclusive. 1 is most important
+	int burst;    // quanta needed to fully run, > 0
+	int priority; // [1 to 4] inclusive. 1 is highest priority
 };
 
 struct PerJobStats
@@ -121,19 +126,21 @@ struct QueueData
     uint16_t priority;//SRT doesn't need this but don't want to make more types.
 };
 
+// Priority Queue Comparison Struct for SRT
 struct SrtComp
 {
-    bool operator()(QueueData a, QueueData b) const
+    bool operator() (QueueData a, QueueData b) const
     {
-        return a.rem>b.rem;
+        return a.rem > b.rem;
     }
 };
 
+// Priority Queue Comparison Struct for HPF 
 struct HpfComp
 {
-    bool operator()(QueueData a, QueueData b) const
+    bool operator() (QueueData a, QueueData b) const
     {
-        return a.priority>b.priority;
+        return a.priority > b.priority;
     }
 };
 

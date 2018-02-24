@@ -1,10 +1,16 @@
 /*
     Algorithms left to complete:
-    -Round-Robin algo
-    -3 following non-preemptive algos:
+    -Round-Robin algo (preemptive)
+    3 following non-preemptive algos:
     --HPF,
     --SJF,
     --HPF-Aging
+
+    Algorithms Completed:
+    * FCFS
+    * SRT
+    * HPF (preemptive)
+    * HPF-aging (preemptive)
 
     Also:
     -cpu idle>2 quanta?
@@ -40,19 +46,30 @@ typedef std::minstd_rand Rng;
 using std::fill;
 using std::sort;
 
+// Template defintion for preemptive scheduling algorithms
+// First argument is for priority queue comparison function
+// Second argument for aging argument
 template<class CmpFunc, bool Aging=false>
 AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt);
 
+// Macro defintion for:
+// SRT with SRT comparison struct
+// HPF (preemptive) with HPF comparison struct
+// HPF with aging (preemptive) with HPF comparison struct
 #define SRT preemptive<SrtComp>
 #define HPF_PREEMPT preemptive<HpfComp>
 #define HPF_PREEMPT_AGE preemptive<HpfComp, true>
 
+// Struct created for each of the scheduling algorithms, containing 2 variables
+// name: name of the algorithm
+// algo: function pointer
 struct Sim
 {
-    const char* name;
-    decltype(&fcfs) algo;//function ptr. a better name for decltype() would be typeof()
+    const char* name;     // name of the algorithm
+    decltype(&fcfs) algo; //function ptr. a better name for decltype() would be typeof()
 };
 
+//
 struct Sums
 {
     int wait, response, turnaround;
@@ -71,11 +88,13 @@ const Sim simulations[] =
     {"HPF-Aging (preemptive)", &HPF_PREEMPT_AGE}//&hpf_preemptive}
 };
 
+// Void function that prints line to standard output
 void writeln(const char* a, int n)
 {
-    fwrite(a, 1, n, stdout);
-    putchar('\n');
+    fwrite(a, 1, n, stdout);  // print n-element char array, a, to stdout
+    putchar('\n');            // new line char to flush print buffer
 }
+
 
 Sums printJobLines(const Job* job, const PerJobStats* stats)
 {
@@ -178,13 +197,16 @@ int main(int argc, char** argv)
 
     printf("Seed: 0x%X, Number of tests: %d\n", initSeed, ntests);
 
+    // For each loop iterating over each of our scheduling algorithms 
     for (const Sim sim : simulations)
     {
         //@TODO: remove this
+        // temporarily skip non-implemented algorithms
         if (sim.algo==nullptr){ printf("TODO: %s\n", sim.name); continue; }
 
+        // 
         for (int i=0; i<BagSize; ++i) shufbag[i] = i+1;
-        Rng rng(initSeed);//each algo gets same data
+        Rng rng(initSeed); // Initialize RNG with the same seed
         double aa_wait=0.0, aa_turnaround=0.0, aa_response=0.0, aa_thruput=0.0;
         printf("\n*** Testing algorithm: %s ***\n", sim.name);
 
@@ -239,23 +261,34 @@ int main(int argc, char** argv)
     }//for each algorithm
 
 	return 0;
-}
+} // end of main()
 
+// First Come First Serve Scheduling  comptime: current quanta + Algorithm
+// Returns AlgoRet consisting of:
+// 1) number of jobs completed
+// 2) time of last job completion 
 AlgoRet fcfs(const Job* job, int njobs, PerJobStats* stats, char* t)
 {
-    int j=0;
-    int q=0;//elapsed quanta
+    int j=0; // variable to keep track of j^th run 
+    int q=0; // variable for current quanta time (elapsed quanta)
 
-    while (q<QUANTA)
+    // Continue running jobs until elasped quanta is 100
+    while (q < QUANTA)
     {
+        // if job arrival time is greater than current quanta
         if (q < job[j].arrival)
         {
+            // CPU waiting from current quanta until job arrival
             fill(t+q, t+job[j].arrival, '.');
+            // set current quanta to job arrival time
             q = job[j].arrival;
         }
-
+        
+        // comptime: current quanta + burst (time at which the job finished) 
         int const comptime = q+job[j].burst;
-
+ 
+        // store stats for j^th run
+        // current quanta and   
         stats[j] = {q, comptime};
 
         fill(t+q, t+comptime, j+'A');
@@ -264,8 +297,8 @@ AlgoRet fcfs(const Job* job, int njobs, PerJobStats* stats, char* t)
             break;
     }
 
-    return {j, q};//jobs completed, elapsed quanta
-}
+    return {j, q}; //jobs completed, elapsed quanta
+} // end of fcfs()
 
 /*
     (Jonathan):
