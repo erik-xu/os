@@ -104,7 +104,7 @@ public:
 
     For this explanation, convention is larger priority values are
     more important. A jobs priority increases every 5 slices.
-    Let q = current slice. To determine if job a is more important then job b
+    Let q = current slice. To determine if job a is more important relative to job b
     in the queue, do:
         a.priority*5 + (q-a.arrival) > b.priority*5 + (q-b.arrival)
     Note how the q's cancel, and left with a constant value once inserted into the queue.
@@ -119,30 +119,6 @@ struct QueueData
     uint8_t id;
     uint8_t bserved;
     uint16_t priority;//SRT doesn't need this but don't want to make more types.
-
-    static
-    QueueData init(const Job jb, unsigned id)
-    {
-        QueueData r;
-
-        r.rem = jb.burst;
-        r.id = id;
-        r.bserved = false;
-        r.priority = jb.priority;//not always needed or overwritten
-
-        return r;
-    }
-};
-
-struct AgeInit
-{
-    static
-    QueueData init(const Job jb, unsigned id)
-    {
-        QueueData r = QueueData::init(jb, id);
-        r.priority = jb.priority*5u + jb.arrival;
-        return r;
-    }
 };
 
 struct SrtComp

@@ -40,12 +40,12 @@ typedef std::minstd_rand Rng;
 using std::fill;
 using std::sort;
 
-template<class CmpFunc, class InitFunc>
+template<class CmpFunc, bool Aging=false>
 AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt);
 
-#define SRT preemptive<SrtComp, QueueData>
-#define HPF_PREEMPT preemptive<HpfComp, QueueData>
-#define HPF_PREEMPT_AGE preemptive<HpfComp, AgeInit>
+#define SRT preemptive<SrtComp>
+#define HPF_PREEMPT preemptive<HpfComp>
+#define HPF_PREEMPT_AGE preemptive<HpfComp, true>
 
 struct Sim
 {
@@ -110,6 +110,43 @@ double printAvg(int sum, int cnt, const char* str)
     return avg;
 }
 
+//not a thuro test, but can catch errors
+void testFreqs(const Job* job, int njobs, const PerJobStats* stats, const char* gantt, int lastCompTime)
+{
+    static_assert(NJOBS < 26u, "");
+    int cnt[26]={};
+    int dots=0;
+    bool fail = false;
+
+    for (int q=0; q<lastCompTime && !fail; ++q)
+    {
+        unsigned id = gantt[q];
+        if (id=='.')
+            ++dots;
+        else if ((id = (id|32) - 'a') < 26u)
+            cnt[id]+=1;
+        else
+            fail = true;
+    }
+
+    if (!fail)
+    {
+        int bsums=0;
+        for (int i=0; i<njobs; ++i)
+        {
+            if (stats[i].qend!=0)
+                bsums += job[i].burst,//comma
+                fail |= (job[i].burst != cnt[i]);
+            else
+                fail |= (cnt[i] != 0);
+        }
+        fail |= (bsums != lastCompTime-dots);
+    }
+
+    if (fail)
+        fputs("\nincorrect algorithm getchar()", stdout), getchar();
+}
+
 //progname [ntests] [rng seed]
 int main(int argc, char** argv)
 {
@@ -167,6 +204,8 @@ int main(int argc, char** argv)
 
             fill(stats, stats+NJOBS, PerJobStats{});//zero to simplify logic of potentially unserviced jobs
             AlgoRet r = sim.algo(job, NJOBS, stats, timechart);
+
+            testFreqs(job, NJOBS, stats, timechart, r.lastCompletionTime);
 
             printf("\nTest no: %d\n", testno);
             const Sums sums = printJobLines(job, stats);
@@ -230,8 +269,7 @@ AlgoRet fcfs(const Job* job, int njobs, PerJobStats* stats, char* t)
 
 /*
     (Jonathan):
-    Look at the end of this file for my original impl of SRT.
-    Later I realized that SRT, HPF_preemptive
+    I realized that SRT, HPF_preemptive
     and HPF_ preemptive aging are nearly identical, and created this template.
 
     SRT compares against remaining time
@@ -241,11 +279,23 @@ AlgoRet fcfs(const Job* job, int njobs, PerJobStats* stats, char* t)
     So the only changes to the algorithms are the priority queue compare function
     and the init step taken inserting a job into the queue
 */
-template<class Cmp, class I>
-AlgoRet preemptive(const Job* job, int njobs, PerJobStats* stats, char* gantt)
+
+QueueData fillData(const Job& jb, unsigned id, bool aging)
+{
+    QueueData dat;
+    dat.id = id;
+    dat.rem = jb.burst;
+    dat.bserved = false;
+
+    dat.priority = aging ? jb.priority*5u + jb.arrival : jb.priority;
+    return dat;
+}
+
+template<class CmpFunc, bool Aging=false>
+AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
 {
 
-    PriorityQueue<QueueData, Cmp> pque(njobs);
+    PriorityQueue<QueueData, CmpFunc> pque(njobs);
 
     int j=0;
     int q=0;//elapsed quanta
@@ -255,7 +305,7 @@ AlgoRet preemptive(const Job* job, int njobs, PerJobStats* stats, char* gantt)
         //first: check if a new job arrives at this slice
         if (q == job[j].arrival)
         {
-            pque.push(I::init(job[j], j));//init data based on heuristic for algo
+            pque.push(fillData(job[j], j, Aging));//init data based on heuristic for algo
             ++j;
             //goto more in loop
         }
@@ -274,13 +324,13 @@ AlgoRet preemptive(const Job* job, int njobs, PerJobStats* stats, char* gantt)
             stats[id].qbegin = q;
             ptop->bserved = true;
         }
-        else if(--ptop->rem==0)//run for 1 time unit
+
+        gantt[q++] = id+'A';//inc q here so setting end time is correct below, half-open q)
+        if(--ptop->rem==0)//run for 1 time unit
         {
             stats[id].qend = q;
             pque.pop();
         }
-
-        gantt[q++] = id+'A';
     }
     //all jobs have been inserted to queue,
     //those that were serviced but not completed need to finish,
@@ -305,125 +355,9 @@ AlgoRet preemptive(const Job* job, int njobs, PerJobStats* stats, char* gantt)
     return {j, q};//jobs completed, elapsed quanta
 }
 
-//my original SRT impl
-#if 0
-struct SrtData{short rem; unsigned char id; unsigned char bserved;};
-struct SrtComp
-{
-    bool operator()(SrtData a, SrtData b) const { return a.rem>b.rem; }
-};
 
 /*
-    j is index of next arriving job,
-    all jobs put into queue, when q==arrival time
 
-    if pque is empty, advance 1 slice idle
-    else run job at pque top for 1 slice by decrementing remaining time,
-    retains heap invariant
-
-    after all jobs inserted, second loop
-    finishes processing jobs hat were given time,
-    and will start ones if q<QUANTA
-*/
-AlgoRet srt(const Job* job, int njobs, PerJobStats* stats, char* t)
-{
-    PriorityQueue<SrtData, SrtComp> pque(njobs);
-
-    int j=0;
-    int q=0;//elapsed quanta
-
-    //everything will go in, but may not be serviced a single slice, example:
-    //ID arrive burst
-    // A     20    10
-    // B     25    99
-    // C     30    98
-    //B wont be given a slice
-    //C will be given a slice before 100 quanta,
-    //and since started, will be finished (after 100 quanta)
-    while (j!=njobs)
-    {
-        if (q == job[j].arrival)
-        {
-            pque.push({(short)job[j].burst, (unsigned char)j, false});
-            ++j;
-            //more in loop
-        }
-        else if (pque.empty())
-        {
-            t[q++] = '.';
-            continue;
-        }
-        //will not invalidate heap invariant (incrementing would)
-        SrtData *const ptop = const_cast<SrtData *>(&pque.top());
-        unsigned const id = ptop->id;
-
-        if (!ptop->bserved)//instead could memset .qbegin field of stats to sentinel value
-        {
-            stats[id].qbegin = q;
-            ptop->bserved = true;
-        }
-        else if(--ptop->rem==0)//run for 1 time unit
-        {
-            stats[id].qend = q;
-            pque.pop();
-        }
-
-        t[q++] = id+'A';
-    }
-
-    while (!pque.empty())
-    {
-        const SrtData topv = pque.top();
-        pque.pop();
-
-        if (!topv.bserved)
-        {
-            if (q<QUANTA)   stats[topv.id].qbegin = q;//more in loop
-            else            { --j; continue; }//don't begin service >= QUANTA
-        }
-
-        unsigned const comptime = q + topv.rem;
-        fill(t+q, t+comptime, topv.id+'A');
-        stats[topv.id].qend = q = comptime;
-    }
-
-    return {j, q};//jobs completed, elapsed quanta
-}
-#endif
-
-
-
-/*
-Note how B is finished due to aging before
-D even though D is initially more important
-
-*** Testing algorithm: HPF-Aging (preemptive) ***
-
-Test no: 0
-ID Arrival Burst Priority : Response Wait Turnaround
- A       0     6        4 :        0    0          6
- B       8    16        4 :        0   13         29
- C      11    12        2 :        0    0         12
- D      35     9        2 :       13   13         22
- E      37     9        1 :        1    1         10
- F      44    12        4 :       31   31         43
- G      48    16        1 :       10   10         26
- H      59     5        4 :        ~    ~          ~
- I      63    16        3 :       25   26         42
- J      75    11        4 :        ~    ~          ~
- K      79     8        1 :        ~    ~          ~
- L      99    10        1 :        ~    ~          ~
-
-
-Average wait       :  94/8 = 11.750
-Average response   :  80/8 = 10.000
-Average turnaround : 190/8 = 23.750
-Throughput: 8/105 = 0.076190 per single quantum
-
-Execution chart:
-0         1         2         3         4         5         6         7         8         9         10        11        12
-0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8 0 2 4 6 8
-AAAAAAA.BBBCCCCCCCCCCCCCBBBBBBBBBBBBBBEEEEEEEEEEDDDDDDDDDDGGGGGGGGGGGGGGGGGFFFFFFFFFFFFFIIIIIIIIIIIIIIIII
 */
 
 
