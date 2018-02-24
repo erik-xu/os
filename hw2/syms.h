@@ -4,18 +4,18 @@
 #ifndef H_SYMS
 #define H_SYMS
 
-#define INIT_SEED 0xcafebeef//use same rng seed so each algo uses same data
-#define QUANTA 100
-#define NJOBS 12
+#define INIT_SEED 0xcafebeef // use same rng seed so each algo uses same data
+#define QUANTA 100	         // units of time
+#define NJOBS 12	         // total number of jobs/processes ran 
 #define MAX_BURST 16
 #define MIN_BURST 3
 #define BURST_SPAN (MAX_BURST-MIN_BURST+1u)
 
 struct Job
 {
-	int arrival;
-	int burst;//quanta needed to fully run, > 0
-	int priority;//[1 to 4] inclusive. 1 is most important
+	int arrival;  // arrival time of process in quanta
+	int burst;    //quanta needed to fully run, > 0
+	int priority; //[1 to 4] inclusive. 1 is most important
 };
 
 struct PerJobStats
