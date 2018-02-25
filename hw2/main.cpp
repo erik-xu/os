@@ -410,13 +410,57 @@ AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *
 {
     // Priority Queue that sorts job based on remaining time, priority, etc. 
     PriorityQueue<QueueData, HpfComp> pque(njobs);
-
     int j = 0; // index of j^th job
     int q = 0; // elapsed quanta
-    QueueData *ptop;
     unsigned id; // ID of current running job 
     bool Aging = false;
+    pque.push(fillData(job[j], j, Aging));
+    j++;
+    QueueData *ptop = pque.ptr_top();
+    
+    while (q < QUANTA) {
+      id = ptop->id;
+      // if job arrival time is greater than current quanta
+      if (q < job[id].arrival)
+      {
+          // print '.' to signify waiting from current quanta until job arrival
+          fill(gantt+q, gantt+job[id].arrival, '.');
+          // set current quanta to job arrival time
+          q = job[id].arrival;
+      }
 
+      // job completion time: current quanta + burst
+      int const comptime = q + job[id].burst;
+
+      // store stats for j^th job
+      // current quanta and completion time
+      stats[id] = {q, comptime};
+
+      // print letter to signify job is running
+      // j ranges from 1 to 12, 1 + A = B, 2 + A = C, etc.
+      fill(gantt+q, gantt+comptime, id+'A');
+      q = comptime;
+      pque.pop();
+      //++j;
+
+      for (int i = j; i < njobs; ++i) {
+        if (job[i].arrival <= q) {
+          pque.push(fillData(job[i], i, Aging));
+          j++;
+        } else {
+            if (pque.empty()) {
+              pque.push(fillData(job[i], i, Aging));
+              j++;
+            }
+          break;
+        } 
+      }
+      ptop = pque.ptr_top(); 
+    }
+    
+    return {j-int(pque.size())-1, q}; //jobs completed, elapsed quanta
+}
+    /*
     //every job will be inserted, unlike fcfs
     while (j != njobs) {
         // first: check if a new job arrives at this slice
@@ -522,5 +566,4 @@ AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *
 
     return {j, q}; // jobs completed, elapsed quanta
 }
-
-
+*/
