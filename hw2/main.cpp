@@ -60,11 +60,6 @@ using std::sort;
 template<class CmpFunc, bool Aging=false>
 AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt);
 
-// Template prototype for non-preemptive scheduling algorithms
-template<class CmpFunc, bool Aging=false>
-AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt);
-
-
 // Macro defintion for:
 // SRT with SRT comparison struct
 // HPF (preemptive) with HPF comparison struct
@@ -72,7 +67,6 @@ AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gant
 #define SRT preemptive<SrtComp>
 #define HPF_PREEMPT preemptive<HpfComp>
 #define HPF_PREEMPT_AGE preemptive<HpfComp, true>
-#define HPF_NON_PREEMPT non_preemptive<HpfComp>
 
 // Struct created for each of the scheduling algorithms, containing 2 variables
 // name: name of the algorithm
@@ -99,7 +93,7 @@ const Sim simulations[] =
     {"Shortest Job First (non-preemptive)", nullptr},//&sjf},
     {"Shortest Remaining Time (preemptive)", &SRT},
     {"Round Robin", nullptr},//&round_robin},
-    {"Highest Priority (non-preemptive)", &HPF_NON_PREEMPT},//&hpf_non_preemptive},
+    {"Highest Priority (non-preemptive)", &hpf_non_preemptive},//&hpf_non_preemptive},
     {"Highest Priority (preemptive)", &HPF_PREEMPT},//&hpf_preemptive}
     {"HPF-Aging (non-preemptive)", nullptr},//&hpf_preemptive}
     {"HPF-Aging (preemptive)", &HPF_PREEMPT_AGE}//&hpf_preemptive}
@@ -410,17 +404,18 @@ AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
 }
 
 
-// Non-Preemptive algorithm implementation
-template<class CmpFunc, bool Aging=false>
-AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
+// HPF Non-Preemptive Scheduling Algorithm
+// Priority Queue (min. heap) is used to keep track of jobs with highest priority (1 is greatest)
+AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
 {
     // Priority Queue that sorts job based on remaining time, priority, etc. 
-    PriorityQueue<QueueData, CmpFunc> pque(njobs);
+    PriorityQueue<QueueData, HpfComp> pque(njobs);
 
     int j = 0; // index of j^th job
     int q = 0; // elapsed quanta
     QueueData *ptop;
     unsigned id; // ID of current running job 
+    bool Aging = false;
 
     //every job will be inserted, unlike fcfs
     while (j != njobs) {
