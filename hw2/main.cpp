@@ -447,10 +447,7 @@ AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gant
             continue;
         }
         
-        // print running job to STDOUT 
-        // increment time (quanta)
-        gantt[q++] = id + 'A';
- 
+         
         // once current job is done running, get ready for next job
         // get the next job in the queue (based on priority or remaining time)
         // set the current pointer
@@ -482,7 +479,12 @@ AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gant
           stats[id].qbegin = q;
           stats[id].qend = q + job[id].burst;
           ptop->bserved = true; 
-      }      
+        }
+
+        // print running job to STDOUT 
+        // increment time (quanta)
+        gantt[q++] = id + 'A';
+     
     } // end of job scheduling
 
     // if we reached the end of the job insertion, but haven't finished printing to STDOUT the running job
@@ -509,8 +511,8 @@ AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gant
             // if the job hasn't been served yet, and current quanta is greater or equal to 100
             // then we shouldn't include this job in j (jobs completed counter)
             else {
-                --j;
-                continue;
+              --j;
+              continue;
             } //don't begin service >= QUANTA
         } 
         // if the job has been served, then continue to next job
@@ -525,7 +527,5 @@ AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gant
 
     return {j, q}; // jobs completed, elapsed quanta
 }
-
-
 
 
