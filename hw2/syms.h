@@ -120,10 +120,12 @@ public:
 
 struct QueueData
 {
-    uint16_t rem;
-    uint8_t id;
-    uint8_t bserved;
-    uint16_t priority;//SRT doesn't need this but don't want to make more types.
+    uint16_t rem;      // remainder of the job left for execution (burst - X)
+                       // where X = how long the job has ran
+    uint8_t  id;       // id of the job
+    uint8_t  bserved;  // variable to track whether job has been served
+                       // TODO: set this to false since fillData() defaults this to false
+    uint16_t priority; // SRT doesn't need this but don't want to make more types.
 };
 
 // Priority Queue Comparison Struct for SRT
@@ -140,7 +142,7 @@ struct HpfComp
 {
     bool operator() (QueueData a, QueueData b) const
     {
-        return a.priority > b.priority;
+        return a.priority < b.priority;
     }
 };
 
