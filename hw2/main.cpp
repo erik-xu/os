@@ -60,11 +60,6 @@ using std::sort;
 template<class CmpFunc, bool Aging=false>
 AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt);
 
-// Template prototype for non-preemptive scheduling algorithms
-template<class CmpFunc, bool Aging=false>
-AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt);
-
-
 // Macro defintion for:
 // SRT with SRT comparison struct
 // HPF (preemptive) with HPF comparison struct
@@ -72,7 +67,6 @@ AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gant
 #define SRT preemptive<SrtComp>
 #define HPF_PREEMPT preemptive<HpfComp>
 #define HPF_PREEMPT_AGE preemptive<HpfComp, true>
-#define HPF_NON_PREEMPT non_preemptive<HpfComp>
 
 // Struct created for each of the scheduling algorithms, containing 2 variables
 // name: name of the algorithm
@@ -99,7 +93,7 @@ const Sim simulations[] =
     {"Shortest Job First (non-preemptive)", nullptr},//&sjf},
     {"Shortest Remaining Time (preemptive)", &SRT},
     {"Round Robin", nullptr},//&round_robin},
-    {"Highest Priority (non-preemptive)", &HPF_NON_PREEMPT},//&hpf_non_preemptive},
+    {"Highest Priority (non-preemptive)", &hpf_non_preemptive},//&hpf_non_preemptive},
     {"Highest Priority (preemptive)", &HPF_PREEMPT},//&hpf_preemptive}
     {"HPF-Aging (non-preemptive)", nullptr},//&hpf_preemptive}
     {"HPF-Aging (preemptive)", &HPF_PREEMPT_AGE}//&hpf_preemptive}
@@ -410,122 +404,65 @@ AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
 }
 
 
-// Non-Preemptive algorithm implementation
-template<class CmpFunc, bool Aging=false>
-AlgoRet non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
+// HPF Non-Preemptive Scheduling Algorithm
+// Priority Queue (min. heap) is used to keep track of jobs with highest priority (1 is greatest)
+AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
 {
-    // Priority Queue that sorts job based on remaining time, priority, etc. 
-    PriorityQueue<QueueData, CmpFunc> pque(njobs);
+    // Priority Queue that sorts job based on priority 
+    PriorityQueue<QueueData, HpfComp> pque(njobs);
+    int j = 0;          // number of jobs completed 
+    int q = 0;          // elapsed quanta
+    unsigned id;        // ID of current running job 
+    bool Aging = false; // Non-aging HPF
 
-    int j = 0; // index of j^th job
-    int q = 0; // elapsed quanta
-    QueueData *ptop;
-    unsigned id; // ID of current running job 
-
-    //every job will be inserted, unlike fcfs
-    while (j != njobs) {
-        // first: check if a new job arrives at this slice
-        if (q == job[j].arrival) {
-            pque.push(fillData(job[j], j, Aging)); //init data based on heuristic for algo
-            ++j;
-
-            // base case: first job
-            // set start and end time
-            // set served flag
-            if (j == 1) {
-              ptop = pque.ptr_top();
-              id = ptop->id;
-              stats[id].qbegin = q;
-              stats[id].qend = q + job[id].burst;
-              ptop->bserved = true;
-            }
-        }
-        // skip rest of the loop until a job arrives into the queue 
-        else if (pque.empty())
-        {
-            gantt[q++] = '.';
-            continue;
-        }
-        
-        // print running job to STDOUT 
-        // increment time (quanta)
-        gantt[q++] = id + 'A';
- 
-        // once current job is done running, get ready for next job
-        // get the next job in the queue (based on priority or remaining time)
-        // set the current pointer
-        // set the start / end time, and set the served flag
-        // 
-        if (q >= stats[id].qbegin + job[id].burst) {
-          // Decrementing will not invalidate heap invariant for SRT (incrementing might)
-          // Grab "most important" job by the heuristic, it may be the one just pushed
-          //stats[id].qend = stats[id].qbegin + job[id].burst;
-          ptop = pque.ptr_top();
-          
-          // no new job has come in yet, if the served flag is true
-          // pop the top job since it is done executing
-          while (ptop->bserved == true) {
-            pque.pop();
-            if (pque.empty()) {
-              break;
-            }
-            ptop = pque.ptr_top();
-          }
-          
-          // if queue is empty, move on to next quanta 
-          if (pque.empty() == true) {
-            continue;
-          } 
-        
-          // if there is a next job and it hasn't been served yet
-          id = ptop->id;
-          stats[id].qbegin = q;
-          stats[id].qend = q + job[id].burst;
-          ptop->bserved = true; 
-      }      
-    } // end of job scheduling
-
-    // if we reached the end of the job insertion, but haven't finished printing to STDOUT the running job
-    // then continue printing until it's done
-    while (q <= stats[id].qbegin + job[id].burst) {
-      gantt[q++] = id + 'A';
-    }
-
-    // all jobs have been inserted to queue,
-    // those that were not serviced but need to finish,
-    // those not are able to be serviced within QUANTA should be ignored,
-    // decrementing njobs return value
+    // Start queue with the first job 
+    pque.push(fillData(job[j], j, Aging));
+    j++;
+    QueueData *ptop = pque.ptr_top();
    
-    while (!pque.empty())
-    {
-        const QueueData topv = pque.top();
-        pque.pop();
+    // Add new jobs into queue 
+    while (q < QUANTA) {
+      id = ptop->id;
+      // fast forward if current quanta is before arrival of next job
+      if (q < job[id].arrival)
+      {
+          // print '.' to signify waiting from current quanta until job arrival
+          fill(gantt+q, gantt+job[id].arrival, '.');
+          // set current quanta to job arrival time
+          q = job[id].arrival;
+      }
 
-        if (!topv.bserved)
-        {
-            if (q < QUANTA) {
-              stats[topv.id].qbegin = q; // more in loop
-            } 
-            // if the job hasn't been served yet, and current quanta is greater or equal to 100
-            // then we shouldn't include this job in j (jobs completed counter)
-            else {
-                --j;
-                continue;
-            } //don't begin service >= QUANTA
+      // job completion time: current quanta + burst
+      int const comptime = q + job[id].burst;
+
+      // store stats for j^th job
+      // current quanta (beginning of processing time)  and completion time
+      stats[id] = {q, comptime};
+
+      // print letter to signify job is running
+      // j ranges from 1 to 12, 1 + A = B, 2 + A = C, etc.
+      fill(gantt+q, gantt+comptime, id+'A');
+      q = comptime; // set current quanta to completion time of current job
+      pque.pop();   // take the completed job
+
+      // put into the queue of jobs that have arrived while the previous job was running
+      for (int i = j; i < njobs; ++i) {
+        // check if the arrival of the job
+        if (job[i].arrival <= q) {
+          pque.push(fillData(job[i], i, Aging));
+          j++;
         } 
-        // if the job has been served, then continue to next job
+        // if no job has arrived, put the next job in (we'll account for this in the fast forward, line 424)
         else {
-          continue;
-        }
-
-        unsigned const comptime = q + topv.rem;
-        fill(gantt+q, gantt+comptime, topv.id+'A');
-        stats[topv.id].qend = q = comptime;
+            if (pque.empty()) {
+              pque.push(fillData(job[i], i, Aging));
+              j++;
+            }
+          break; // stop checking for jobs once the arrival is greater than the current quanta 
+        } 
+      }
+      ptop = pque.ptr_top(); 
     }
-
-    return {j, q}; // jobs completed, elapsed quanta
+    
+    return {j-int(pque.size())-1, q}; //jobs completed, elapsed quanta
 }
-
-
-
-

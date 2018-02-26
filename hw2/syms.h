@@ -142,7 +142,7 @@ struct HpfComp
 {
     bool operator() (QueueData a, QueueData b) const
     {
-        return a.priority < b.priority;
+        return a.priority > b.priority;
     }
 };
 
