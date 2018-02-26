@@ -408,19 +408,22 @@ AlgoRet preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
 // Priority Queue (min. heap) is used to keep track of jobs with highest priority (1 is greatest)
 AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *gantt)
 {
-    // Priority Queue that sorts job based on remaining time, priority, etc. 
+    // Priority Queue that sorts job based on priority 
     PriorityQueue<QueueData, HpfComp> pque(njobs);
-    int j = 0; // index of j^th job
-    int q = 0; // elapsed quanta
-    unsigned id; // ID of current running job 
-    bool Aging = false;
+    int j = 0;          // number of jobs completed 
+    int q = 0;          // elapsed quanta
+    unsigned id;        // ID of current running job 
+    bool Aging = false; // Non-aging HPF
+
+    // Start queue with the first job 
     pque.push(fillData(job[j], j, Aging));
     j++;
     QueueData *ptop = pque.ptr_top();
-    
+   
+    // Add new jobs into queue 
     while (q < QUANTA) {
       id = ptop->id;
-      // if job arrival time is greater than current quanta
+      // fast forward if current quanta is before arrival of next job
       if (q < job[id].arrival)
       {
           // print '.' to signify waiting from current quanta until job arrival
@@ -433,26 +436,29 @@ AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *
       int const comptime = q + job[id].burst;
 
       // store stats for j^th job
-      // current quanta and completion time
+      // current quanta (beginning of processing time)  and completion time
       stats[id] = {q, comptime};
 
       // print letter to signify job is running
       // j ranges from 1 to 12, 1 + A = B, 2 + A = C, etc.
       fill(gantt+q, gantt+comptime, id+'A');
-      q = comptime;
-      pque.pop();
-      //++j;
+      q = comptime; // set current quanta to completion time of current job
+      pque.pop();   // take the completed job
 
+      // put into the queue of jobs that have arrived while the previous job was running
       for (int i = j; i < njobs; ++i) {
+        // check if the arrival of the job
         if (job[i].arrival <= q) {
           pque.push(fillData(job[i], i, Aging));
           j++;
-        } else {
+        } 
+        // if no job has arrived, put the next job in (we'll account for this in the fast forward, line 424)
+        else {
             if (pque.empty()) {
               pque.push(fillData(job[i], i, Aging));
               j++;
             }
-          break;
+          break; // stop checking for jobs once the arrival is greater than the current quanta 
         } 
       }
       ptop = pque.ptr_top(); 
