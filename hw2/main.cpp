@@ -462,7 +462,12 @@ AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *
         } 
       }
       ptop = pque.ptr_top(); 
+    } // end of while()
+   
+    // return jobs completed, elapsed quanta
+    if (pque.size() == 0) {
+      return {j, q};
+    } else {
+      return {j-int(pque.size()), q};
     }
-    
-    return {j-int(pque.size())-1, q}; //jobs completed, elapsed quanta
 }
