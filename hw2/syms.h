@@ -126,6 +126,7 @@ struct QueueData
     uint8_t  bserved;  // variable to track whether job has been served
                        // TODO: set this to false since fillData() defaults this to false
     uint16_t priority; // SRT doesn't need this but don't want to make more types.
+    uint8_t  arrival;   // jobs with the same priority but earlier arrival time are executed first
 };
 
 // Priority Queue Comparison Struct for SRT
@@ -142,9 +143,14 @@ struct HpfComp
 {
     bool operator() (QueueData a, QueueData b) const
     {
-        return a.priority > b.priority;
+      if (a.priority > b.priority) return true;
+      else if (a.priority == b.priority && a.arrival > b.arrival) return true;
+      else if (a.priority == b.priority && a.arrival < b.arrival) return false;
+      else return false; 
     }
 };
+
+QueueData fillData(const Job& jb, unsigned id, bool aging);
 
 #endif
 
