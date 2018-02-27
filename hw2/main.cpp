@@ -395,7 +395,7 @@ AlgoRet hpf_non_preemptive(const Job *job, int njobs, PerJobStats *stats, char *
    
     // Add new jobs into queue 
     // quit while loop if: 1) after quanta 99 or 2) 12 jobs have been completed
-    while (q < QUANTA && (j <= 12 && pque.size() != 0)) {
+    while (q < QUANTA && (j <= njobs && pque.size() != 0)) {
       id = ptop->id;
       // fast forward if current quanta is before arrival of next job
       if (q < job[id].arrival)
