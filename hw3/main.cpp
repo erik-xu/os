@@ -8,7 +8,7 @@ Simulator:
 5. Think of the simulation as main() that include:
 a. Create the necessary data structures including the 10 queues for the different sellers and initialize each queue with its ticket buyers up front based on the N value.
 b. Create the 10 threads and each will be set with a sell() function and seller type as arguments.
-c. Wakeupall10threadstoexecuteinparallel;wakeup_all_seller_threads();
+c. Wakeup all 10 threads to execute in parallel; wakeup_all_seller_threads();
 d. Wait for all threads to complete
 e. Exit
 
@@ -53,6 +53,7 @@ class Seller {
     static vector<vector<int>> *seats;
     static vector<priority_queue<Buyer, vector<Buyer>, mycomparison>> *buyer_queue;
     static int *clock;
+    bool took_turn = false;
     char type;
     int id;
     Seller(char type, int id) {
@@ -200,21 +201,35 @@ void sell_tickets(Seller *seller) {
 
 // seller thread to serve one time slice (1 minute)
 void *sell(void *seller) {
-  while (*Seller::clock < HOUR) {
+  //while (*Seller::clock < HOUR) {
+  while (((Seller *)seller)->took_turn == false) {
     pthread_mutex_lock(&mutex);
-    
-    // atomically release mutex and wait on cond until somebody does signal or broadcast. 
-    // when you are awaken as a result of signal or broadcast, you acquire the mutex again. 
     pthread_cond_wait(&cond, &mutex);
+
+    cout << "Seller: " << ((Seller *) seller)->id << endl;
+    cout << "Time: " << *Seller::clock << endl;
+    cout << "Obtaining mutex..." << endl;
+    cout << "Condition lifted" << endl; 
+
     Buyer buyer = (*Seller::buyer_queue)[((Seller *)seller)->id].top(); 
-    if (buyer.arrival_time + buyer.serve_time < *Seller::clock) {
-      (*Seller::clock)++;
-      pthread_cond_signal(&cond);
+    //cout << "Seller: " << ((Seller *) seller)->id << endl;
+    ((Seller *)seller)->took_turn = true;
+     
+    if ((buyer.arrival_time + buyer.serve_time) < *Seller::clock) {
+      cout << "No buyers in line. Move to next seller!" << *Seller::clock << endl;
+      //(*Seller::clock)++;
     } else {
       //clock++;
       //buyer_queue[seller.id].pop();
+      cout << "Serving buyer (arrival time: " << buyer.arrival_time << ", serve time: " << buyer.serve_time << ")" << endl;
+      cout << buyer.arrival_time + buyer.serve_time << " " << *Seller::clock << endl;
+      cout << ((buyer.arrival_time + buyer.serve_time) > *Seller::clock) << endl;
       sell_tickets(((Seller *)seller));
+      print_seats(*Seller::seats);
     } 
+    
+    // atomically release mutex and wait on cond until somebody does signal or broadcast. 
+    // when you are awaken as a result of signal or broadcast, you acquire the mutex again. 
 
     pthread_mutex_unlock(&mutex);
     // Serve any buyer available in this seller queue that is ready
@@ -224,6 +239,51 @@ void *sell(void *seller) {
 } // sell()
 
 
+// Timer thread tick determination
+// clock should tick if top buyer in each queue hasn't been served yet
+// clock should tick even after all top buyers have been served
+// determine not tick condition
+bool ticktock(vector<Seller> sellers) {
+  for (int seller = 0; seller < NUM_SELLERS; seller++) {
+    if (sellers[seller].took_turn == false) {
+      return false;
+    } 
+  } 
+
+  return true;
+}
+
+void reset_turns(vector<Seller> sellers) {
+  for (int seller = 0; seller < NUM_SELLERS; seller++) {
+    sellers[seller].took_turn = false;
+  } 
+}
+
+
+// counter for Timer thread
+void *countdown(void *arg) {
+  //bool flag = 0;
+
+  cout << "entering timer thread" << endl;  
+  pthread_mutex_lock(&mutex);
+  vector<Seller> sellers = *((vector<Seller> *)arg);
+
+  while (*Seller::clock < HOUR) {
+
+    if (!ticktock(sellers)) {
+      pthread_cond_signal(&cond);
+    } else {
+      (*Seller::clock)++;
+      //flag = 1;
+      reset_turns(sellers);
+      cout << "Tick tock" << endl;
+    } 
+
+    pthread_mutex_unlock(&mutex);
+  }
+
+  return NULL;
+} // countdown()
 
 void wakeup_all_seller_threads() {
   // get the lock to have predictable scheduling
@@ -281,14 +341,19 @@ int main(int argc, char* argv[]) {
     pthread_create(&tids[i], NULL, sell, (void *)&sellers[i]);
   }
 
+  pthread_t time; 
+  pthread_create(&time, NULL, countdown, (void *)&sellers);
 
   // wakeup all seller threads
+  cout << "Signaling threads to wakeup!" << endl;
   wakeup_all_seller_threads();
 
   // wait for all seller threads to exit
   for (i = 0 ; i < 10 ; i++) 
     pthread_join(tids[i], NULL);
-
+  
+  pthread_join(time, NULL);
+  
   // Printout simulation results
   // ............
   exit(0); 
