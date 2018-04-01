@@ -36,7 +36,16 @@
 *.depend
 *.cbp
 
+# libre office
+*.~lock*
+
+ignore/
+release/
+bin/
+obj/
+
 *.bak
 
-
-
+# java
+*.class
+*.jar
