@@ -284,6 +284,7 @@ int main(int argc, char** argv)
 
                     processes[prevFrameInfo.ownerId].pageTable[prevFrameInfo.theirVirtNo] = ~diski;
                     diskinfo[diski] = prevFrameInfo;
+                    //print eviction info
                 }
             }
 
