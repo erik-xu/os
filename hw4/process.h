@@ -4,11 +4,14 @@
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
 #include <string>
+#include <iostream>     // cout
 
 using std::string;
+using std::cout;
+using std::endl;
 
 /* initialize random seed: */
-srand (time(NULL));
+//srand (time(NULL));
 
 class Process {
   public: 
@@ -24,7 +27,6 @@ class Process {
     void gen_service_time();
     
 };
-
 
 
 #endif
