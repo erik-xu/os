@@ -93,8 +93,11 @@ PagePolicy* NewUp()
 
 const AlgoDescriptor algos[]=
 {
+
+	{ &NewUp<FIFOPolicy>, "FIFO: First In First Out" },
     { &NewUp<LruPolicy>, "LRU: Least Recently Used" },
-    { &NewUp<RandPolicy>, "Random" }//, your other stuff here...
+    { &NewUp<RandPolicy>, "Random" }
+	//, your other stuff here...
 };
 
 struct ProcessInit
@@ -159,6 +162,7 @@ PageInfo frameinfo[TotalFrames];
 
 int main(int argc, char** argv)
 {
+    int const printPeriod = argc == 2 ? atoi(argv[1]) : 5;
     uint32_t printcntr = printPeriod > 0 ? 1u : 0u;//decs to big num so never prints
 
     for (const AlgoDescriptor *algo=algos; algo!=endof(algos); ++algo)
