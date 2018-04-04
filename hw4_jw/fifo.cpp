@@ -1,47 +1,40 @@
 #include "util.h"
 #include <stdio.h>
 #include <list>
+#include <queue>
+using namespace std;
 
 class FIFOPolicy : public PagePolicy {
-
-	using ListType = std::list<pageno_t>;
-	using Iter = ListType::iterator;
-	Iter accessIters[TotalFrames];//indexed by physical frame numbers
-	std::list<pageno_t> ls;//front is more recent then back
+	std::queue<pageno_t> q;
 
 	public:
 		FIFOPolicy() {
-			for (Iter& rf : accessIters)//note ref
-				rf = ls.end();//a nullptr wrapper or some fixed sentinel node
+			//nothing needed
 		}
 
 	public:
 		void UseFreeFrame(pageno_t frameno)
 		{
-			ls.push_back(frameno);
-			accessIters[frameno] = ls.begin();
+			q.push(frameno);
 		}
 
 	public:
 		//If a page needs to be evicted
-		//@return evicted page??
+		//@return evicted page
 		pageno_t PickFrameToEvict()
 		{
-			int const backval = ls.front(); //FIFO = remove front
-			ls.pop_front();
-		
-			ls.push_back(backval);
-			accessIters[backval] = ls.begin();
-
-			return backval;
+			if (!q.empty()) {
+				pageno_t temp = q.front();
+				q.pop();
+				return temp;
+			}
 		}
 
 	public:
 		//If page is already loaded
 		void UpdateAfterHit(pageno_t frameno)
 		{
-			//do nothing because FIFO
-			//accessIters[frameno] = ls.begin();	//reset??
+			//do nothing
 		}
 
 };
