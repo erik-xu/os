@@ -22,6 +22,7 @@
 #include "fifo.cpp"
 #include "rand.h"
 #include "lru.h"
+#include "lfu.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,8 +95,9 @@ PagePolicy* NewUp()
 const AlgoDescriptor algos[]=
 {
 
-	{ &NewUp<FIFOPolicy>, "FIFO: First In First Out" },
+	//{ &NewUp<FIFOPolicy>, "FIFO: First In First Out" },
     { &NewUp<LruPolicy>, "LRU: Least Recently Used" },
+    { &NewUp<LfuPolicy>, "LFU: Least Frequently Used"},
     { &NewUp<RandPolicy>, "Random" }
 	//, your other stuff here...
 };

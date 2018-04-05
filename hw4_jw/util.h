@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 #include <assert.h>
+#include <algorithm>
+#include <iostream>
+
+using std::cout;
+using std::endl;
 
 enum
 {
