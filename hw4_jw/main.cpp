@@ -96,9 +96,9 @@ const AlgoDescriptor algos[]=
 {
 
 	//{ &NewUp<FIFOPolicy>, "FIFO: First In First Out" },
-    { &NewUp<LruPolicy>, "LRU: Least Recently Used" },
-    { &NewUp<LfuPolicy>, "LFU: Least Frequently Used"},
-    { &NewUp<RandPolicy>, "Random" }
+  //  { &NewUp<LruPolicy>, "LRU: Least Recently Used" }
+    { &NewUp<LfuPolicy>, "LFU: Least Frequently Used"}
+  //  { &NewUp<RandPolicy>, "Random" }
 	//, your other stuff here...
 };
 
